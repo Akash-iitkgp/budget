@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .container { max-width: 800px; margin-top: 30px; }
+        .bucket { margin-bottom: 20px; padding: 15px; border-radius: 8px; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Budget Tracker</h1>
+        
+        <!-- Add Expense Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Add Expense</h5>
+                <form id="expenseForm">
+                    <div class="mb-3">
+                        <label class="form-label">Amount (₹)</label>
+                        <input type="number" class="form-control" id="amount" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-control" id="category" required>
+                            <option value="groceries">Groceries</option>
+                            <option value="utilities">Utilities</option>
+                            <option value="rent">Rent</option>
+                            <option value="transportation">Transportation</option>
+                            <option value="entertainment">Entertainment</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" id="date" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Expense</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add New Category -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Add New Category</h5>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="newCategory" placeholder="Category name">
+                    <button class="btn btn-success" id="addCategory">Add</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expenses Summary -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Expenses Summary</h5>
+                <canvas id="expenseChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Expense List -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Recent Expenses</h5>
+                <div id="expenseList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize data structure
+        let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+        let categories = JSON.parse(localStorage.getItem('categories')) || [
+            'groceries', 'utilities', 'rent', 'transportation', 'entertainment'
+        ];
+
+        // Update categories in select
+        function updateCategories() {
+            const select = document.getElementById('category');
+            select.innerHTML = '';
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+                select.appendChild(option);
+            });
+            localStorage.setItem('categories', JSON.stringify(categories));
+        }
+
+        // Add new category
+        document.getElementById('addCategory').addEventListener('click', () => {
+            const newCat = document.getElementById('newCategory').value.toLowerCase();
+            if (newCat && !categories.includes(newCat)) {
+                categories.push(newCat);
+                updateCategories();
+                document.getElementById('newCategory').value = '';
+            }
+        });
+
+        // Add expense
+        document.getElementById('expenseForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const expense = {
+                amount: parseFloat(document.getElementById('amount').value),
+                category: document.getElementById('category').value,
+                date: document.getElementById('date').value,
+                id: Date.now()
+            };
+            expenses.push(expense);
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+            updateExpenseList();
+            updateChart();
+            e.target.reset();
+        });
+
+        // Update expense list
+        function updateExpenseList() {
+            const list = document.getElementById('expenseList');
+            list.innerHTML = '';
+            expenses.sort((a, b) => new Date(b.date) - new Date(a.date))
+                .forEach(expense => {
+                    const div = document.createElement('div');
+                    div.className = 'bucket';
+                    div.innerHTML = `
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>₹${expense.amount}</strong> - ${expense.category}
+                            </div>
+                            <div>
+                                ${new Date(expense.date).toLocaleDateString()}
+                                <button class="btn btn-sm btn-danger ms-2" onclick="deleteExpense(${expense.id})">Delete</button>
+                            </div>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+        }
+
+        // Delete expense
+        function deleteExpense(id) {
+            expenses = expenses.filter(e => e.id !== id);
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+            updateExpenseList();
+            updateChart();
+        }
+
+        // Update chart
+        function updateChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            const categoryTotals = {};
+            
+            expenses.forEach(expense => {
+                categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + expense.amount;
+            });
+
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(categoryTotals),
+                    datasets: [{
+                        data: Object.values(categoryTotals),
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                            '#FF9F40', '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initial render
+        updateCategories();
+        updateExpenseList();
+        updateChart();
+    </script>
+</body>
+</html>
